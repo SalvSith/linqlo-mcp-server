@@ -215,7 +215,7 @@ module.exports = async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -235,24 +235,46 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      // SSE endpoint - handle initial connection properly
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      // SSE endpoint - proper MCP SSE implementation
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
 
-      // Send immediate response for tools discovery
-      const toolsResponse = {
+      // Keep connection alive
+      const keepAlive = setInterval(() => {
+        res.write(': keep-alive\n\n');
+      }, 30000);
+
+      // Handle client disconnect
+      req.on('close', () => {
+        clearInterval(keepAlive);
+      });
+
+      // Send proper MCP initialization
+      const initMessage = {
         jsonrpc: '2.0',
-        id: 'tools-discovery',
-        result: {
-          tools: mcpHandler.getTools()
+        method: 'notifications/initialized',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {
+            tools: {
+              listChanged: false
+            }
+          },
+          serverInfo: {
+            name: 'Supabase Read-Only MCP Server',
+            version: '1.0.0'
+          }
         }
       };
 
-      res.write(`data: ${JSON.stringify(toolsResponse)}\n\n`);
+      res.write(`data: ${JSON.stringify(initMessage)}\n\n`);
 
-      // Handle message from query parameter
+      // Handle incoming messages from query parameters or body
       if (req.query.message) {
         try {
           const message = JSON.parse(decodeURIComponent(req.query.message));
@@ -271,7 +293,8 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      res.end();
+      // Don't end immediately - keep connection open for SSE
+      return;
     } else if (req.method === 'POST') {
       // Handle MCP messages via POST
       const message = req.body;
