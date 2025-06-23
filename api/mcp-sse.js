@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 // Available tables in the database
 const TABLES = [
@@ -211,7 +211,7 @@ class SupabaseSSEHandler {
   }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
