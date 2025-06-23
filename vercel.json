@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/mcp-sse.js": {
+      "runtime": "@vercel/node"
+    }
+  }
+} 
