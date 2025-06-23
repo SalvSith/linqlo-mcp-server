@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "MCP server for read-only access to Supabase database",
   "main": "src/sse-server.js",
-  "type": "module",
+
   "scripts": {
     "start": "node src/sse-server.js start",
     "dev": "node --watch src/sse-server.js start 3001",
