@@ -235,20 +235,22 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      // SSE endpoint
+      // SSE endpoint - handle initial connection properly
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
 
-      // Send initial connection message
-      const initialMessage = {
-        server: 'Supabase Read-Only MCP Server',
-        version: '1.0.0',
-        tools: mcpHandler.getTools(),
-        capabilities: ['tools']
+      // Send immediate response for tools discovery
+      const toolsResponse = {
+        jsonrpc: '2.0',
+        id: 'tools-discovery',
+        result: {
+          tools: mcpHandler.getTools()
+        }
       };
 
-      res.write(`data: ${JSON.stringify(initialMessage)}\n\n`);
+      res.write(`data: ${JSON.stringify(toolsResponse)}\n\n`);
 
       // Handle message from query parameter
       if (req.query.message) {
@@ -257,13 +259,21 @@ module.exports = async function handler(req, res) {
           const response = await mcpHandler.handleMCPMessage(message);
           res.write(`data: ${JSON.stringify(response)}\n\n`);
         } catch (error) {
-          res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+          const errorResponse = {
+            jsonrpc: '2.0',
+            id: 'error',
+            error: {
+              code: -32603,
+              message: error.message
+            }
+          };
+          res.write(`data: ${JSON.stringify(errorResponse)}\n\n`);
         }
       }
 
       res.end();
     } else if (req.method === 'POST') {
-      // Handle MCP messages
+      // Handle MCP messages via POST
       const message = req.body;
       const response = await mcpHandler.handleMCPMessage(message);
       res.json(response);
@@ -271,6 +281,11 @@ module.exports = async function handler(req, res) {
       res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('MCP Server Error:', error);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message,
+      details: 'Check server logs for more information'
+    });
   }
 } 
